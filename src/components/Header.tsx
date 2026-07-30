@@ -1,11 +1,12 @@
 import React from 'react';
-import { Barcode, Printer, History, Package } from 'lucide-react';
+import { Barcode, Printer, History, Package, Database } from 'lucide-react';
 
 interface HeaderProps {
   onOpenPrintSheet: () => void;
   onOpenBatch?: () => void;
   onOpenHistory: () => void;
   onOpenCatalog: () => void;
+  onOpenSupabase: () => void;
   historyCount: number;
   catalogCount: number;
 }
@@ -14,6 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPrintSheet,
   onOpenHistory,
   onOpenCatalog,
+  onOpenSupabase,
   historyCount,
   catalogCount,
 }) => {
@@ -42,6 +44,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right header actions */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenSupabase}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition-colors focus:outline-hidden focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+            title="Supabase Cloud Database & CRUD Hub"
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">Supabase Cloud</span>
+            <span className="sm:hidden">Supabase</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          </button>
+
           <button
             type="button"
             onClick={onOpenCatalog}
@@ -86,3 +100,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

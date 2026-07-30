@@ -147,58 +147,6 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 flex flex-col gap-6">
-      {/* 0. Printer Presets & Auto-Detect Local Printer */}
-      <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Printer className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              Printer Sizing Preset
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={handleAutoDetect}
-            disabled={isDetectingPrinter}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isDetectingPrinter ? 'animate-spin' : ''}`} />
-            {isDetectingPrinter ? 'Detecting...' : 'Auto-Detect Local Printer'}
-          </button>
-        </div>
-
-        {/* Preset Selector Buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
-          {PRINTER_PRESETS.map((preset) => {
-            const isSelected = options.printerPresetId === preset.id || (!options.printerPresetId && preset.id === 'zebra_zd230');
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => handleSelectPrinterPreset(preset)}
-                className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
-                  isSelected
-                    ? 'bg-emerald-950/80 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500'
-                    : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
-                }`}
-              >
-                <div className="font-bold text-[11px] truncate">{preset.brand}</div>
-                <div className="text-[10px] font-mono text-emerald-400 font-semibold mt-0.5">
-                  {preset.widthInches}″ × {preset.heightInches}″
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {detectionStatus && (
-          <div className="text-[11px] bg-slate-800 border border-slate-700 p-2.5 rounded-xl text-slate-300 leading-relaxed flex items-start gap-2">
-            <Cpu className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-            <div>{detectionStatus}</div>
-          </div>
-        )}
-      </div>
-
       {/* 1. Item Selection & Batch Input (Main Workflow) */}
       <div className="space-y-4 pb-4 border-b border-slate-100">
         <div className="flex items-center justify-between">
@@ -840,6 +788,58 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
                 </div>
               </>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Printer Sizing Preset & Auto-Detect Local Printer */}
+      <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-sm space-y-3 pt-3 border-t border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Printer className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+              Printer Sizing Preset
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={handleAutoDetect}
+            disabled={isDetectingPrinter}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-xs cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isDetectingPrinter ? 'animate-spin' : ''}`} />
+            {isDetectingPrinter ? 'Detecting...' : 'Auto-Detect Local Printer'}
+          </button>
+        </div>
+
+        {/* Preset Selector Buttons */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+          {PRINTER_PRESETS.map((preset) => {
+            const isSelected = options.printerPresetId === preset.id || (!options.printerPresetId && preset.id === 'zebra_zd230');
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handleSelectPrinterPreset(preset)}
+                className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-emerald-950/80 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500'
+                    : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
+                }`}
+              >
+                <div className="font-bold text-[11px] truncate">{preset.brand}</div>
+                <div className="text-[10px] font-mono text-emerald-400 font-semibold mt-0.5">
+                  {preset.widthInches}″ × {preset.heightInches}″
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {detectionStatus && (
+          <div className="text-[11px] bg-slate-800 border border-slate-700 p-2.5 rounded-xl text-slate-300 leading-relaxed flex items-start gap-2">
+            <Cpu className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+            <div>{detectionStatus}</div>
           </div>
         )}
       </div>

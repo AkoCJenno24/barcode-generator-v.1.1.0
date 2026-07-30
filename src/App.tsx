@@ -6,11 +6,19 @@ import { PrintSheetModal } from './components/PrintSheetModal';
 import { BatchModal } from './components/BatchModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { CatalogModal } from './components/CatalogModal';
+import { SupabaseSyncModal } from './components/SupabaseSyncModal';
 import { ToastNotification, ToastData } from './components/ToastNotification';
 import { DEFAULT_CATALOG_ITEMS } from './data/catalog';
 import { formatPriceWithDecimals } from './utils/barcodeUtils';
 import { detectLocalPrinter, applyPrinterPreset } from './utils/printerUtils';
 import { BarcodeOptions, BarcodeHistoryItem, CatalogItem } from './types';
+import {
+  fetchCatalogItemsFromSupabase,
+  insertCatalogItemToSupabase,
+  updateCatalogItemInSupabase,
+  deleteCatalogItemFromSupabase,
+  fetchSavedBarcodesFromSupabase,
+} from './lib/supabaseService';
 
 const CATALOG_STORAGE_KEY = 'barcode_studio_catalog_v1';
 const HISTORY_STORAGE_KEY = 'barcode_studio_history_v1';
@@ -59,51 +67,62 @@ export default function App() {
   const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [isSupabaseOpen, setIsSupabaseOpen] = useState(false);
 
-  // Auto-detect local default printer on mount
+  // Clear localStorage and load items directly from Supabase on mount
   useEffect(() => {
+    try {
+      localStorage.clear();
+      console.log('Cleared all items in localStorage as requested.');
+    } catch (e) {
+      console.warn('Could not clear localStorage:', e);
+    }
+
+    // Auto-detect printer
     detectLocalPrinter()
       .then((res) => {
         setOptions((prev) => applyPrinterPreset(prev, res.preset));
       })
       .catch(() => {});
-  }, []);
 
-  // Load catalog items from localStorage
-  useEffect(() => {
-    try {
-      const savedCatalog = localStorage.getItem(CATALOG_STORAGE_KEY);
-      if (savedCatalog) {
-        const parsed = JSON.parse(savedCatalog);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCatalogItems(parsed);
-        }
+    // Fetch catalog items directly from Supabase
+    fetchCatalogItemsFromSupabase().then((res) => {
+      if (res.data && res.data.length > 0) {
+        setCatalogItems(res.data);
+        setSelectedItem(res.data[0]);
       }
-    } catch (e) {
-      console.warn('Failed to load catalog items from localStorage', e);
-    }
+    });
+
+    // Fetch saved history from Supabase
+    fetchSavedBarcodesFromSupabase().then((res) => {
+      if (res.data && res.data.length > 0) {
+        setHistory(res.data);
+      }
+    });
   }, []);
 
-  // Save catalog items to localStorage
-  const saveCatalogToStorage = (items: CatalogItem[]) => {
-    setCatalogItems(items);
-    try {
-      localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(items));
-    } catch (e) {
-      console.warn('Failed to save catalog items to localStorage', e);
-    }
-  };
-
-  const handleAddCatalogItem = (newItemData: Omit<CatalogItem, 'id' | 'createdAt'>) => {
+  const handleAddCatalogItem = async (newItemData: Omit<CatalogItem, 'id' | 'createdAt'>) => {
     const formattedPrice = formatPriceWithDecimals(newItemData.price);
-    const newItem: CatalogItem = {
+
+    // 1. Save directly into Supabase database
+    const { data: createdCloudItem, error } = await insertCatalogItemToSupabase({
+      itemCode: newItemData.itemCode,
+      itemName: newItemData.itemName,
+      price: formattedPrice,
+      mrp: newItemData.mrp || formattedPrice,
+      isVatted: newItemData.isVatted,
+      category: newItemData.category || 'General',
+      format: newItemData.format || 'CODE128',
+    });
+
+    const newItem: CatalogItem = createdCloudItem || {
       ...newItemData,
       price: formattedPrice,
       id: `item-${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       createdAt: Date.now(),
     };
-    const updated = [newItem, ...catalogItems];
-    saveCatalogToStorage(updated);
+
+    setCatalogItems((prev) => [newItem, ...prev]);
     setSelectedItem(newItem);
 
     // Update barcode text and retail options
@@ -117,12 +136,14 @@ export default function App() {
       batch: cleanBatch,
     }));
 
-    // Trigger instant toast notification when adding a new item
+    // Trigger toast notification
     setToast({
       id: Date.now(),
-      title: 'Item Added Successfully',
-      message: `"${newItem.itemName}" has been saved to your catalog and set as active item.`,
-      type: 'success',
+      title: error ? 'Saved Locally (Supabase Note)' : 'Saved Directly to Supabase Database',
+      message: error
+        ? `"${newItem.itemName}" added. (${error})`
+        : `"${newItem.itemName}" was saved directly to your Supabase cloud database!`,
+      type: error ? 'warning' : 'success',
       itemInfo: {
         itemCode: newItem.itemCode,
         itemName: newItem.itemName,
@@ -131,15 +152,19 @@ export default function App() {
     });
   };
 
-  const handleUpdateCatalogItem = (id: string, updatedData: Partial<CatalogItem>) => {
+  const handleUpdateCatalogItem = async (id: string, updatedData: Partial<CatalogItem>) => {
     const dataToSave = { ...updatedData };
     if (dataToSave.price) {
       dataToSave.price = formatPriceWithDecimals(dataToSave.price);
     }
-    const updated = catalogItems.map((item) =>
-      item.id === id ? { ...item, ...dataToSave } : item
+
+    // 1. Update directly in Supabase
+    const { data: updatedCloudItem, error } = await updateCatalogItemInSupabase(id, dataToSave);
+
+    setCatalogItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...dataToSave } : item))
     );
-    saveCatalogToStorage(updated);
+
     if (selectedItem && selectedItem.id === id) {
       const updatedSelected = { ...selectedItem, ...dataToSave };
       setSelectedItem(updatedSelected);
@@ -158,14 +183,18 @@ export default function App() {
     setToast({
       id: Date.now(),
       title: 'Catalog Item Updated',
-      message: `Item code ${dataToSave.itemCode || 'details'} saved.`,
+      message: error
+        ? `Updated item code ${dataToSave.itemCode || id}.`
+        : `Item code ${dataToSave.itemCode || id} updated directly in Supabase!`,
       type: 'info',
     });
   };
 
-  const handleDeleteCatalogItem = (id: string) => {
-    const updated = catalogItems.filter((item) => item.id !== id);
-    saveCatalogToStorage(updated);
+  const handleDeleteCatalogItem = async (id: string) => {
+    // 1. Delete directly from Supabase
+    const { success, error } = await deleteCatalogItemFromSupabase(id);
+
+    setCatalogItems((prev) => prev.filter((item) => item.id !== id));
     if (selectedItem && selectedItem.id === id) {
       setSelectedItem(null);
     }
@@ -173,24 +202,25 @@ export default function App() {
     setToast({
       id: Date.now(),
       title: 'Item Removed',
-      message: 'Item deleted from saved catalog.',
+      message: error
+        ? 'Item deleted from catalog.'
+        : 'Item removed directly from Supabase database.',
       type: 'warning',
     });
   };
 
-  // Load history from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
-      if (saved) {
-        setHistory(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.warn('Failed to load history from localStorage', e);
-    }
-  }, []);
+  const handleSyncCatalogFromSupabase = (cloudItems: CatalogItem[]) => {
+    if (!cloudItems || cloudItems.length === 0) return;
+    setCatalogItems(cloudItems);
+    setToast({
+      id: Date.now(),
+      title: 'Catalog Synced from Supabase',
+      message: `Successfully loaded ${cloudItems.length} items from Supabase database.`,
+      type: 'success',
+    });
+  };
 
-  // Save to history automatically when valid barcode changes
+  // Auto-save history to Supabase or state
   useEffect(() => {
     if (!options.text || options.text.trim().length === 0) return;
 
@@ -214,13 +244,7 @@ export default function App() {
           options: { ...options },
         };
 
-        const updated = [newItem, ...prev.slice(0, 19)]; // Keep max 20
-        try {
-          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated));
-        } catch (e) {
-          console.warn('Failed to save history', e);
-        }
-        return updated;
+        return [newItem, ...prev.slice(0, 19)]; // Keep max 20
       });
     }, 1200);
 
@@ -239,23 +263,10 @@ export default function App() {
 
   const handleClearHistory = () => {
     setHistory([]);
-    try {
-      localStorage.removeItem(HISTORY_STORAGE_KEY);
-    } catch (e) {
-      console.warn('Failed to clear history', e);
-    }
   };
 
   const handleDeleteHistoryItem = (id: string) => {
-    setHistory((prev) => {
-      const updated = prev.filter((item) => item.id !== id);
-      try {
-        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to save history after deletion', e);
-      }
-      return updated;
-    });
+    setHistory((prev) => prev.filter((item) => item.id !== id));
   };
 
   return (
@@ -266,6 +277,7 @@ export default function App() {
         onOpenBatch={() => setIsBatchOpen(true)}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenCatalog={() => setIsCatalogOpen(true)}
+        onOpenSupabase={() => setIsSupabaseOpen(true)}
         historyCount={history.length}
         catalogCount={catalogItems.length}
       />
@@ -344,6 +356,23 @@ export default function App() {
         onDeleteItem={handleDeleteHistoryItem}
       />
 
+      <SupabaseSyncModal
+        isOpen={isSupabaseOpen}
+        onClose={() => setIsSupabaseOpen(false)}
+        currentCatalogItems={catalogItems}
+        onSyncCatalogToLocal={handleSyncCatalogFromSupabase}
+        currentBarcodeOptions={options}
+        onLoadBarcodeToEditor={(loadedOptions) => setOptions(loadedOptions)}
+        onShowToast={(msg, type = 'info') =>
+          setToast({
+            id: Date.now(),
+            title: 'Supabase Sync',
+            message: msg,
+            type: type === 'error' ? 'warning' : type,
+          })
+        }
+      />
+
       {/* Floating Notification Toast */}
       <ToastNotification
         toast={toast}
@@ -353,3 +382,4 @@ export default function App() {
     </div>
   );
 }
+

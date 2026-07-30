@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BarcodeHistoryItem } from '../types';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { History, X, Trash2, ArrowUpRight, Barcode } from 'lucide-react';
 
 interface HistoryDrawerProps {
@@ -19,6 +20,9 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   onClearHistory,
   onDeleteItem,
 }) => {
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<BarcodeHistoryItem | null>(null);
+  const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
+
   if (!isOpen) return null;
 
   return (
@@ -91,8 +95,8 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => onDeleteItem(item.id)}
-                    className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                    onClick={() => setPendingDeleteItem(item)}
+                    className="text-slate-400 hover:text-red-600 transition-colors p-1 cursor-pointer"
                     title="Remove item"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -108,8 +112,8 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
             <button
               type="button"
-              onClick={onClearHistory}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
+              onClick={() => setIsConfirmingClearAll(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Clear History
@@ -117,6 +121,36 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           </div>
         )}
       </div>
+
+      {/* Single Item Delete Confirmation */}
+      <ConfirmDeleteModal
+        isOpen={!!pendingDeleteItem}
+        title="Delete History Item"
+        message="Are you sure you want to delete this saved barcode entry from your history?"
+        itemCode={pendingDeleteItem?.text}
+        itemName={pendingDeleteItem?.options?.itemName || pendingDeleteItem?.title}
+        locationLabel="History Item"
+        onCancel={() => setPendingDeleteItem(null)}
+        onConfirm={() => {
+          if (pendingDeleteItem) {
+            onDeleteItem(pendingDeleteItem.id);
+            setPendingDeleteItem(null);
+          }
+        }}
+      />
+
+      {/* Clear All History Confirmation */}
+      <ConfirmDeleteModal
+        isOpen={isConfirmingClearAll}
+        title="Clear All History"
+        message={`Are you sure you want to permanently clear all ${history.length} saved history entries?`}
+        locationLabel="All History Items"
+        onCancel={() => setIsConfirmingClearAll(false)}
+        onConfirm={() => {
+          onClearHistory();
+          setIsConfirmingClearAll(false);
+        }}
+      />
     </div>
   );
 };

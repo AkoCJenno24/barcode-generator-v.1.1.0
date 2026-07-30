@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CatalogItem } from '../types';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import {
   Package,
   X,
@@ -38,6 +39,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<CatalogItem | null>(null);
 
   // Form states
   const [itemCode, setItemCode] = useState('');
@@ -442,7 +444,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
 
                           <button
                             type="button"
-                            onClick={() => onDeleteItem(item.id)}
+                            onClick={() => setPendingDeleteItem(item)}
                             className={`p-1.5 rounded-lg transition-colors ${
                               isSelected
                                 ? 'text-rose-300 hover:text-rose-100 hover:bg-rose-950/40'
@@ -476,6 +478,23 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Warning Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!pendingDeleteItem}
+        title="Delete Catalog Item"
+        message="Are you sure you want to delete this catalog item? It will be removed from your active database."
+        itemName={pendingDeleteItem?.itemName}
+        itemCode={pendingDeleteItem?.itemCode}
+        locationLabel="Catalog Item"
+        onCancel={() => setPendingDeleteItem(null)}
+        onConfirm={() => {
+          if (pendingDeleteItem) {
+            onDeleteItem(pendingDeleteItem.id);
+            setPendingDeleteItem(null);
+          }
+        }}
+      />
     </div>
   );
 };
