@@ -16,16 +16,17 @@ export interface ToastData {
 interface ToastNotificationProps {
   toast: ToastData | null;
   onDismiss: () => void;
+  duration?: number;
 }
 
-export const ToastNotification: React.FC<ToastNotificationProps> = ({ toast, onDismiss }) => {
+export const ToastNotification: React.FC<ToastNotificationProps> = ({ toast, onDismiss, duration = 2500 }) => {
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => {
       onDismiss();
-    }, 4500);
+    }, duration);
     return () => clearTimeout(timer);
-  }, [toast, onDismiss]);
+  }, [toast, onDismiss, duration]);
 
   if (!toast) return null;
 

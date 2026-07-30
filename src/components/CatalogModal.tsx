@@ -393,7 +393,7 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
                                 isSelected ? 'text-emerald-300' : 'text-emerald-700'
                               }`}
                             >
-                              Price (Vatted): {item.price}
+                              Price: {item.price}
                             </span>
                             {item.isVatted && (
                               <span

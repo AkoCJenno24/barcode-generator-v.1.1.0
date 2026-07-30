@@ -6,6 +6,7 @@ import { PrintSheetModal } from './components/PrintSheetModal';
 import { BatchModal } from './components/BatchModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
 import { CatalogModal } from './components/CatalogModal';
+import { ToastNotification, ToastData } from './components/ToastNotification';
 import { DEFAULT_CATALOG_ITEMS } from './data/catalog';
 import { formatPriceWithDecimals } from './utils/barcodeUtils';
 import { detectLocalPrinter, applyPrinterPreset } from './utils/printerUtils';
@@ -48,6 +49,7 @@ export default function App() {
   const [itemBatch, setItemBatch] = useState<string>(INITIAL_BATCH);
   const [options, setOptions] = useState<BarcodeOptions>(DEFAULT_OPTIONS);
   const [history, setHistory] = useState<BarcodeHistoryItem[]>([]);
+  const [toast, setToast] = useState<ToastData | null>(null);
 
   const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false);
   const [isBatchOpen, setIsBatchOpen] = useState(false);
@@ -110,6 +112,19 @@ export default function App() {
       price: formattedPrice,
       batch: cleanBatch,
     }));
+
+    // Trigger instant toast notification when adding a new item
+    setToast({
+      id: Date.now(),
+      title: 'Item Added Successfully',
+      message: `"${newItem.itemName}" has been saved to your catalog and set as active item.`,
+      type: 'success',
+      itemInfo: {
+        itemCode: newItem.itemCode,
+        itemName: newItem.itemName,
+        price: formattedPrice,
+      },
+    });
   };
 
   const handleUpdateCatalogItem = (id: string, updatedData: Partial<CatalogItem>) => {
@@ -135,6 +150,13 @@ export default function App() {
         batch: cleanBatch,
       }));
     }
+
+    setToast({
+      id: Date.now(),
+      title: 'Catalog Item Updated',
+      message: `Item code ${dataToSave.itemCode || 'details'} saved.`,
+      type: 'info',
+    });
   };
 
   const handleDeleteCatalogItem = (id: string) => {
@@ -143,6 +165,13 @@ export default function App() {
     if (selectedItem && selectedItem.id === id) {
       setSelectedItem(null);
     }
+
+    setToast({
+      id: Date.now(),
+      title: 'Item Removed',
+      message: 'Item deleted from saved catalog.',
+      type: 'warning',
+    });
   };
 
   // Load history from localStorage
@@ -309,6 +338,13 @@ export default function App() {
         onSelectHistoryItem={handleSelectHistoryItem}
         onClearHistory={handleClearHistory}
         onDeleteItem={handleDeleteHistoryItem}
+      />
+
+      {/* Floating Notification Toast */}
+      <ToastNotification
+        toast={toast}
+        onDismiss={() => setToast(null)}
+        duration={2500}
       />
     </div>
   );
