@@ -52,8 +52,8 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
   const [isExporting, setIsExporting] = useState(false);
 
   // Interactive On-Canvas Drag-to-Resize State
-  const [isDragging, setIsDragging] = useState<false | 'right' | 'bottom' | 'corner' | 'border' | 'font' | 'gap'>(false);
-  const [activeResizerTab, setActiveResizerTab] = useState<'all' | 'barcode' | 'gap' | 'text' | 'border' | 'frame'>('all');
+  const [isDragging, setIsDragging] = useState<false | 'right' | 'bottom' | 'corner' | 'border' | 'font' | 'gap' | 'borderTextGap'>(false);
+  const [activeResizerTab, setActiveResizerTab] = useState<'all' | 'barcode' | 'gap' | 'borderGap' | 'text' | 'border' | 'frame'>('all');
   const [dragStart, setDragStart] = useState<{
     x: number;
     y: number;
@@ -62,6 +62,7 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
     borderWidth: number;
     fontSize: number;
     barcodePriceGap: number;
+    borderTextGap: number;
   }>({
     x: 0,
     y: 0,
@@ -70,6 +71,7 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
     borderWidth: 7,
     fontSize: 18,
     barcodePriceGap: 15,
+    borderTextGap: 6,
   });
 
   // Inline Editing Overlay Toggle
@@ -141,7 +143,7 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
   // Drag-to-resize handlers on canvas handles
   const handlePointerDown = (
     e: React.PointerEvent,
-    dragType: 'right' | 'bottom' | 'corner' | 'border' | 'font' | 'gap'
+    dragType: 'right' | 'bottom' | 'corner' | 'border' | 'font' | 'gap' | 'borderTextGap'
   ) => {
     if (!onChangeOptions) return;
     e.preventDefault();
@@ -161,6 +163,7 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
       borderWidth: options.borderWidth !== undefined ? options.borderWidth : 7,
       fontSize: baseFontSize,
       barcodePriceGap: options.barcodePriceGap !== undefined ? options.barcodePriceGap : defaultGap,
+      borderTextGap: options.borderTextGap !== undefined ? options.borderTextGap : 6,
     });
   };
 
@@ -209,6 +212,14 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
       onChangeOptions({
         ...options,
         barcodePriceGap: newGap,
+      });
+    }
+
+    if (isDragging === 'borderTextGap') {
+      const newGap = Math.max(0, Math.min(24, Math.round(dragStart.borderTextGap + (dx + dy) / 10)));
+      onChangeOptions({
+        ...options,
+        borderTextGap: newGap,
       });
     }
   };
@@ -290,7 +301,34 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {onChangeOptions && (
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/90 text-[11px]">
+              <span className="text-[10px] font-bold text-slate-500 uppercase px-1.5 hidden sm:inline-block">
+                Border Gap:
+              </span>
+              {[
+                { label: '0px', val: 0 },
+                { label: '6px', val: 6 },
+                { label: '12px', val: 12 },
+              ].map((preset) => (
+                <button
+                  key={preset.val}
+                  type="button"
+                  onClick={() => onChangeOptions({ ...options, borderTextGap: preset.val })}
+                  title={`Set border to text gap to ${preset.val}px`}
+                  className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                    (options.borderTextGap ?? 6) === preset.val
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {onChangeOptions && (
             <button
               type="button"
@@ -307,9 +345,15 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
           )}
 
           {dimensions.width > 0 && !renderError && (
-            <span className="text-xs font-mono text-slate-500 font-semibold bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md hidden sm:inline-block">
-              {(options.activeFrameWidthInches || 1.80).toFixed(2)}″ × {(options.activeFrameHeightInches || 0.70).toFixed(2)}″ Frame
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-mono font-bold text-slate-700 bg-emerald-50 border border-emerald-200 text-emerald-800 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Zebra ZD230 203 DPI Crisp Text
+              </span>
+              <span className="text-xs font-mono text-slate-500 font-semibold bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md hidden md:inline-block">
+                {(options.activeFrameWidthInches || 1.80).toFixed(2)}″ × {(options.activeFrameHeightInches || 0.70).toFixed(2)}″ Frame
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -351,7 +395,13 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
               <svg
                 ref={svgRef}
                 className="w-full h-full block mx-auto object-contain pointer-events-none"
-                style={{ width: '100%', height: '100%' }}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  textRendering: 'geometricPrecision',
+                  shapeRendering: 'crispEdges',
+                  imageRendering: 'crisp-edges',
+                }}
               ></svg>
 
               {/* INTERACTIVE DRAG-TO-RESIZE HANDLES FOR ALL LIVE PREVIEW COMPONENTS */}
@@ -377,6 +427,17 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
                     className="absolute top-0 right-0 w-6 h-6 bg-slate-800/80 hover:bg-slate-700 text-sky-400 rounded-bl-lg cursor-nesw-resize transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-md z-20 border-l border-b border-slate-600"
                   >
                     <Type className="w-3 h-3" />
+                  </div>
+
+                  {/* Top-Center Drag Handle (Border-Text Gap) */}
+                  <div
+                    onPointerDown={(e) => handlePointerDown(e, 'borderTextGap')}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    title="Drag to adjust gap between border and inside text"
+                    className="absolute top-0 left-1/2 -translate-x-1/2 h-3 hover:h-4 w-12 bg-indigo-500/30 hover:bg-indigo-500/80 text-white rounded-b-md cursor-ns-resize transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-xs z-20 border-b border-x border-indigo-400/50"
+                  >
+                    <div className="h-0.5 w-5 bg-white/90 rounded-full"></div>
                   </div>
 
                   {/* Bottom-Left Drag Handle (Barcode ↔ Price Gap Spacing) */}
@@ -430,6 +491,7 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
             {isDragging && (
               <div className="mt-2 bg-emerald-500 text-white text-[11px] font-mono font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-2 animate-bounce">
                 {isDragging === 'border' && <span>Border Thickness: {options.borderWidth ?? 7}px</span>}
+                {isDragging === 'borderTextGap' && <span>Border ↔ Inside Text Gap: {options.borderTextGap ?? 6}px</span>}
                 {isDragging === 'font' && <span>Text Font Size: {options.fontSize ?? 18}px</span>}
                 {isDragging === 'gap' && <span>Barcode ↔ Price Gap: {options.barcodePriceGap ?? Math.round((options.fontSize || 18) * 0.85)}px</span>}
                 {(isDragging === 'bottom' || isDragging === 'corner') && <span>Height: {options.height}px</span>}
@@ -583,6 +645,7 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
             {[
               { id: 'all', label: 'All Controls' },
               { id: 'barcode', label: '📊 Barcode' },
+              { id: 'borderGap', label: '↔️ Border-Text Gap' },
               { id: 'gap', label: '↕️ Barcode-Price Gap' },
               { id: 'text', label: '🔤 Text Font' },
               { id: 'border', label: '🖼️ Border Frame' },
@@ -951,6 +1014,108 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
                     </div>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* 3.5. BORDER ↔ INSIDE TEXT GAP RESIZER & TOGGLE CONTROL */}
+            {(activeResizerTab === 'all' || activeResizerTab === 'border' || activeResizerTab === 'borderGap' || activeResizerTab === 'gap') && (
+              <div className="bg-white border border-slate-200/80 rounded-lg p-2.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-800 text-[11px]">Border ↔ Inside Text Gap</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChangeOptions({
+                          ...options,
+                          borderTextGap: (options.borderTextGap ?? 6) > 0 ? 0 : 6,
+                        })
+                      }
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase transition-all cursor-pointer ${
+                        (options.borderTextGap ?? 6) > 0
+                          ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {(options.borderTextGap ?? 6) > 0 ? 'GAP ON' : 'GAP OFF (FLUSH)'}
+                    </button>
+                  </div>
+                  <span className="font-mono text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded">
+                    {options.borderTextGap ?? 6} px
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={options.borderTextGap ?? 6}
+                    onChange={(e) =>
+                      onChangeOptions({
+                        ...options,
+                        borderTextGap: parseInt(e.target.value, 10),
+                      })
+                    }
+                    className="flex-1 accent-indigo-600 h-1.5 cursor-pointer"
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChangeOptions({
+                          ...options,
+                          borderTextGap: Math.max(0, (options.borderTextGap ?? 6) - 1),
+                        })
+                      }
+                      className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold cursor-pointer"
+                    >
+                      <Minus className="w-2.5 h-2.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChangeOptions({
+                          ...options,
+                          borderTextGap: Math.min(20, (options.borderTextGap ?? 6) + 1),
+                        })
+                      }
+                      className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold cursor-pointer"
+                    >
+                      <Plus className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preset Gap Toggle Buttons */}
+                <div className="flex items-center gap-1 justify-between text-[10px]">
+                  {[
+                    { label: '0px (Flush)', val: 0 },
+                    { label: '3px (Tight)', val: 3 },
+                    { label: '6px (Normal)', val: 6 },
+                    { label: '10px (Wide)', val: 10 },
+                    { label: '16px (Spacious)', val: 16 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() =>
+                        onChangeOptions({
+                          ...options,
+                          borderTextGap: preset.val,
+                        })
+                      }
+                      className={`px-1.5 py-0.5 rounded font-mono font-semibold transition-all cursor-pointer ${
+                        (options.borderTextGap ?? 6) === preset.val
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

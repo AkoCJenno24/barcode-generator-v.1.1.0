@@ -119,7 +119,7 @@ export function downloadSvgAsFile(svgElement: SVGSVGElement, fileName: string = 
 
 export function svgToPngDataUrl(
   svgElement: SVGSVGElement,
-  scaleMultiplier: number = 3,
+  scaleMultiplier: number = 4,
   bgColor: string = '#ffffff'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -132,14 +132,17 @@ export function svgToPngDataUrl(
       const svgHeight = svgElement.clientHeight || bbox.height || 150;
 
       const canvas = document.createElement('canvas');
-      canvas.width = svgWidth * scaleMultiplier;
-      canvas.height = svgHeight * scaleMultiplier;
+      canvas.width = Math.round(svgWidth * scaleMultiplier);
+      canvas.height = Math.round(svgHeight * scaleMultiplier);
 
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('Could not get canvas context'));
         return;
       }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       ctx.fillStyle = bgColor === 'transparent' ? '#ffffff' : bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -167,7 +170,7 @@ export function svgToPngDataUrl(
 }
 
 export async function copyBarcodeImageToClipboard(svgElement: SVGSVGElement, bgColor: string = '#ffffff') {
-  const pngDataUrl = await svgToPngDataUrl(svgElement, 2, bgColor);
+  const pngDataUrl = await svgToPngDataUrl(svgElement, 3, bgColor);
   const response = await fetch(pngDataUrl);
   const blob = await response.blob();
   
@@ -293,8 +296,25 @@ export function renderRetailLabelSvg(svgElement: SVGSVGElement, options: Barcode
   svgElement.setAttribute('height', `${svgHeight}`);
   svgElement.setAttribute('shape-rendering', 'crispEdges');
   svgElement.setAttribute('text-rendering', 'geometricPrecision');
+  svgElement.setAttribute('rendering-intent', 'perceptual');
 
   const ns = 'http://www.w3.org/2000/svg';
+
+  // Inject font and shape crispness CSS rules for 203 DPI thermal printers (Zebra ZD230)
+  const styleEl = document.createElementNS(ns, 'style');
+  styleEl.textContent = `
+    text {
+      text-rendering: geometricPrecision !important;
+      shape-rendering: crispEdges !important;
+      -webkit-font-smoothing: antialiased !important;
+      -moz-osx-font-smoothing: grayscale !important;
+      font-smooth: never !important;
+    }
+    rect, path {
+      shape-rendering: crispEdges !important;
+    }
+  `;
+  svgElement.appendChild(styleEl);
 
   // Background fill
   if (options.background && options.background !== 'transparent') {
@@ -324,9 +344,10 @@ export function renderRetailLabelSvg(svgElement: SVGSVGElement, options: Barcode
   const priceFontSize = Math.max(12, Math.round(baseFontSize * 1.1));
   const nameFontSize = Math.max(8, Math.round(baseFontSize * 0.72));
 
-  const paddingX = frameX + Math.max(10, bw + 6);
-  const rightX = frameX + frameWidth - Math.max(10, bw + 6);
-  const topTextY = frameY + Math.max(16, Math.round(codeFontSize * 0.9)) + (bw > 0 ? bw / 2 : 0);
+  const borderTextGap = options.borderTextGap !== undefined ? options.borderTextGap : 6;
+  const paddingX = frameX + Math.max(4, bw + borderTextGap);
+  const rightX = frameX + frameWidth - Math.max(4, bw + borderTextGap);
+  const topTextY = frameY + Math.max(12, Math.round(codeFontSize * 0.9)) + (bw > 0 ? bw / 2 : 0) + (borderTextGap > 6 ? (borderTextGap - 6) * 0.8 : 0);
 
   // Top Left: Item Code (e.g., 11001788)
   const codeText = document.createElementNS(ns, 'text');
@@ -376,10 +397,10 @@ export function renderRetailLabelSvg(svgElement: SVGSVGElement, options: Barcode
   const nameLines = itemName ? wrapText(itemName, nameFontSpec, maxNameWidth) : [];
   const lineSpacing = Math.round(nameFontSize * 1.22);
 
-  const lastLineY = frameY + frameHeight - Math.max(6, Math.round(nameFontSize * 0.4)) - (bw > 0 ? bw / 2 : 0);
+  const lastLineY = frameY + frameHeight - Math.max(6, Math.round(nameFontSize * 0.4)) - (bw > 0 ? bw / 2 : 0) - (borderTextGap > 6 ? (borderTextGap - 6) * 0.8 : 0);
   const bottomNameTop = nameLines.length > 0
     ? (lastLineY - (nameLines.length - 1) * lineSpacing - nameFontSize)
-    : (frameY + frameHeight - Math.max(8, bw + 4));
+    : (frameY + frameHeight - Math.max(4, bw + borderTextGap));
 
   // Calculate available vertical space for [Barcode + Price] to perfectly center them in the frame
   const topHeaderBottom = topTextY + 4;

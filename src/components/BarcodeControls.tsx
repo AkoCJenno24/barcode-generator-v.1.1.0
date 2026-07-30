@@ -528,6 +528,59 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
                       );
                     })}
                   </div>
+
+                  {/* Gap Between Border and Inside Text */}
+                  <div className="pt-2.5 border-t border-slate-200/70 space-y-1.5">
+                    <div className="flex items-center justify-between text-slate-700">
+                      <label htmlFor="border-text-gap-slider" className="font-semibold text-xs flex items-center gap-1.5">
+                        <span>Gap: Border ↔ Inside Text</span>
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
+                          (options.borderTextGap ?? 6) > 0 ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {(options.borderTextGap ?? 6) > 0 ? 'Active' : 'Flush (0px)'}
+                        </span>
+                      </label>
+                      <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 text-xs">
+                        {options.borderTextGap !== undefined ? options.borderTextGap : 6} px
+                      </span>
+                    </div>
+                    <input
+                      id="border-text-gap-slider"
+                      type="range"
+                      min="0"
+                      max="20"
+                      step="1"
+                      value={options.borderTextGap !== undefined ? options.borderTextGap : 6}
+                      onChange={(e) => updateOption('borderTextGap', parseInt(e.target.value, 10))}
+                      className="w-full accent-indigo-600 cursor-pointer"
+                    />
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <span className="text-[10px] text-slate-400 font-medium">Quick Gap:</span>
+                      {[
+                        { label: 'Flush (0px)', val: 0 },
+                        { label: 'Tight (3px)', val: 3 },
+                        { label: 'Standard (6px)', val: 6 },
+                        { label: 'Wide (12px)', val: 12 },
+                      ].map((preset) => {
+                        const currentGap = options.borderTextGap !== undefined ? options.borderTextGap : 6;
+                        const isActive = currentGap === preset.val;
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => updateOption('borderTextGap', preset.val)}
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </>
               )}
             </div>

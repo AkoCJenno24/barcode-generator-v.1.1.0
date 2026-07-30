@@ -36,6 +36,7 @@ export interface BarcodeOptions {
   batch?: string;
   showBorder?: boolean;
   borderWidth?: number;
+  borderTextGap?: number;
   barcodePriceGap?: number;
   fontWeight?: 'normal' | 'bold' | '900';
   letterSpacing?: number;
