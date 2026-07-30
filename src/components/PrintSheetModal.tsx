@@ -27,7 +27,7 @@ export const PrintSheetModal: React.FC<PrintSheetModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setLabelTitle(selectedItem ? selectedItem.itemName : (options.itemName || 'Product Item'));
-      setPrice(selectedItem ? formatPriceWithSymbol(selectedItem.price) : (options.price ? formatPriceWithSymbol(options.price) : '⃁ 5.00'));
+      setPrice(selectedItem ? formatPriceWithSymbol(selectedItem.price) : (options.price ? formatPriceWithSymbol(options.price) : 'SAR 5.00'));
       setShowPrice(true);
     }
   }, [isOpen, selectedItem, options]);
@@ -414,7 +414,7 @@ export const PrintSheetModal: React.FC<PrintSheetModalProps> = ({
                     type="text"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    placeholder="⃁ 5.00"
+                    placeholder="SAR 5.00"
                     className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-slate-200 text-slate-900 text-xs font-medium"
                   />
                 </div>

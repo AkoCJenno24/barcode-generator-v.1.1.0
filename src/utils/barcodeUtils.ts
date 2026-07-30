@@ -24,9 +24,9 @@ export function formatPriceWithSymbol(priceStr: string | undefined | null): stri
 
   const match = formattedDecimals.match(/(\d+(?:\.\d+)?)/);
   if (match) {
-    return `⃁ ${match[1]}`;
+    return `SAR ${match[1]}`;
   }
-  return `⃁ ${formattedDecimals.replace(/SAR/gi, '').trim()}`;
+  return `SAR ${formattedDecimals.replace(/SAR|SR/gi, '').trim()}`;
 }
 
 export function validateBarcodeValue(format: BarcodeFormat, text: string): { isValid: boolean; message?: string } {
