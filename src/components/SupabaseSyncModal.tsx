@@ -132,35 +132,53 @@ export const SupabaseSyncModal: React.FC<SupabaseSyncModalProps> = ({
   // Copy state
   const [copiedSql, setCopiedSql] = useState(false);
 
-  // Search states for live database
+  // Search & Pagination states for live database
   const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogPageSize, setCatalogPageSize] = useState(25);
+
   const [barcodeSearch, setBarcodeSearch] = useState('');
 
   // Delete warning modal state
   const [pendingDeleteCatalog, setPendingDeleteCatalog] = useState<{ id: string; name: string; code?: string } | null>(null);
   const [pendingDeleteBarcode, setPendingDeleteBarcode] = useState<{ id: string; title: string; text?: string } | null>(null);
 
-  // Filtered live Supabase records
-  const filteredRemoteCatalog = remoteCatalog.filter((item) => {
-    const q = catalogSearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      item.itemName.toLowerCase().includes(q) ||
-      item.itemCode.toLowerCase().includes(q) ||
-      (item.category && item.category.toLowerCase().includes(q)) ||
-      (item.price && item.price.toLowerCase().includes(q))
-    );
-  });
+  // Reset catalog page when search or pageSize changes
+  useEffect(() => {
+    setCatalogPage(1);
+  }, [catalogSearch, catalogPageSize]);
 
-  const filteredRemoteBarcodes = remoteBarcodes.filter((bc) => {
+  // High performance memoized search filtering for 20,000+ cloud records
+  const filteredRemoteCatalog = React.useMemo(() => {
+    const q = catalogSearch.trim().toLowerCase();
+    if (!q) return remoteCatalog;
+    return remoteCatalog.filter((item) => {
+      const nameStr = String(item.itemName || '').toLowerCase();
+      const codeStr = String(item.itemCode || '').toLowerCase();
+      const catStr = String(item.category || '').toLowerCase();
+      const priceStr = String(item.price || '').toLowerCase();
+      return nameStr.includes(q) || codeStr.includes(q) || catStr.includes(q) || priceStr.includes(q);
+    });
+  }, [remoteCatalog, catalogSearch]);
+
+  const totalCatalogPages = Math.max(1, Math.ceil(filteredRemoteCatalog.length / catalogPageSize));
+  const safeCatalogPage = Math.min(catalogPage, totalCatalogPages);
+
+  const paginatedRemoteCatalog = React.useMemo(() => {
+    const start = (safeCatalogPage - 1) * catalogPageSize;
+    return filteredRemoteCatalog.slice(start, start + catalogPageSize);
+  }, [filteredRemoteCatalog, safeCatalogPage, catalogPageSize]);
+
+  const filteredRemoteBarcodes = React.useMemo(() => {
     const q = barcodeSearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      bc.title.toLowerCase().includes(q) ||
-      bc.text.toLowerCase().includes(q) ||
-      bc.format.toLowerCase().includes(q)
+    if (!q) return remoteBarcodes;
+    return remoteBarcodes.filter(
+      (bc) =>
+        bc.title.toLowerCase().includes(q) ||
+        bc.text.toLowerCase().includes(q) ||
+        bc.format.toLowerCase().includes(q)
     );
-  });
+  }, [remoteBarcodes, barcodeSearch]);
 
   useEffect(() => {
     if (isOpen) {
@@ -631,7 +649,7 @@ export const SupabaseSyncModal: React.FC<SupabaseSyncModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {filteredRemoteCatalog.map((item) => (
+                        {paginatedRemoteCatalog.map((item) => (
                           <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-2.5 font-mono font-bold text-slate-900">{item.itemCode}</td>
                             <td className="px-4 py-2.5 font-medium text-slate-800">{item.itemName}</td>
@@ -703,6 +721,73 @@ export const SupabaseSyncModal: React.FC<SupabaseSyncModalProps> = ({
                         ))}
                       </tbody>
                     </table>
+
+                    {/* Table Pagination Bar */}
+                    {filteredRemoteCatalog.length > 0 && (
+                      <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="text-slate-500 font-medium">
+                          Showing{' '}
+                          <strong className="text-slate-900">
+                            {((safeCatalogPage - 1) * catalogPageSize + 1).toLocaleString()}
+                          </strong>{' '}
+                          to{' '}
+                          <strong className="text-slate-900">
+                            {Math.min(safeCatalogPage * catalogPageSize, filteredRemoteCatalog.length).toLocaleString()}
+                          </strong>{' '}
+                          of <strong className="text-slate-900">{filteredRemoteCatalog.length.toLocaleString()}</strong> cloud items
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={catalogPageSize}
+                            onChange={(e) => setCatalogPageSize(Number(e.target.value))}
+                            className="px-2 py-1 rounded border border-slate-300 bg-white text-xs font-semibold text-slate-700"
+                          >
+                            <option value={25}>25 / page</option>
+                            <option value={50}>50 / page</option>
+                            <option value={100}>100 / page</option>
+                          </select>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={safeCatalogPage === 1}
+                              onClick={() => setCatalogPage(1)}
+                              className="px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold"
+                            >
+                              «
+                            </button>
+                            <button
+                              type="button"
+                              disabled={safeCatalogPage === 1}
+                              onClick={() => setCatalogPage((p) => Math.max(1, p - 1))}
+                              className="px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold"
+                            >
+                              ‹
+                            </button>
+                            <span className="px-2 font-bold text-slate-800">
+                              {safeCatalogPage} / {totalCatalogPages}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={safeCatalogPage === totalCatalogPages}
+                              onClick={() => setCatalogPage((p) => Math.min(totalCatalogPages, p + 1))}
+                              className="px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold"
+                            >
+                              ›
+                            </button>
+                            <button
+                              type="button"
+                              disabled={safeCatalogPage === totalCatalogPages}
+                              onClick={() => setCatalogPage(totalCatalogPages)}
+                              className="px-2 py-1 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold"
+                            >
+                              »
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
