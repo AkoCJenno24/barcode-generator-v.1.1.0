@@ -74,17 +74,26 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
     const q = comboboxSearch.trim().toLowerCase();
     if (!q) return catalogItems.slice(0, 40);
 
+    const tokens = q.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return catalogItems.slice(0, 40);
+
     const results: CatalogItem[] = [];
     for (let i = 0; i < catalogItems.length; i++) {
       const item = catalogItems[i];
       const nameStr = String(item.itemName || '').toLowerCase();
       const codeStr = String(item.itemCode || '').toLowerCase();
       const catStr = String(item.category || '').toLowerCase();
-      if (
-        nameStr.includes(q) ||
-        codeStr.includes(q) ||
-        (catStr && catStr.includes(q))
-      ) {
+      const priceStr = String(item.price || '').toLowerCase();
+
+      const matches = tokens.every(
+        (token) =>
+          nameStr.includes(token) ||
+          codeStr.includes(token) ||
+          catStr.includes(token) ||
+          priceStr.includes(token)
+      );
+
+      if (matches) {
         results.push(item);
         if (results.length >= 40) break;
       }
@@ -277,11 +286,11 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
                     No matching items found ({catalogItems.length.toLocaleString()} total)
                   </div>
                 ) : (
-                  comboboxFiltered.map((item) => {
+                  comboboxFiltered.map((item, idx) => {
                     const isSelected = selectedItem?.id === item.id;
                     return (
                       <button
-                        key={item.id}
+                        key={`${item.id}_${idx}`}
                         type="button"
                         onClick={() => {
                           handleSelectCatalogItem(item.id);
