@@ -59,9 +59,9 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
               </p>
             </div>
           ) : (
-            history.map((item) => (
+            history.map((item, idx) => (
               <div
-                key={item.id}
+                key={`${item.id}_${idx}`}
                 className="group border border-slate-200/80 rounded-xl p-3 hover:border-slate-300 hover:shadow-xs transition-all bg-white relative flex flex-col gap-1.5"
               >
                 <div className="flex items-center justify-between">
