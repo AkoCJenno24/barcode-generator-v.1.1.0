@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { CatalogItem, BarcodeHistoryItem, BarcodeOptions } from '../types';
+import { formatPriceWithDecimals } from '../utils/barcodeUtils';
 
 export interface SupabaseResponse<T> {
   data: T | null;
@@ -88,24 +89,46 @@ export async function fetchCatalogItemsFromSupabase(): Promise<{
   error: string | null;
 }> {
   try {
-    const { data, error } = await supabase
-      .from('catalog_items')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let allRows: SupabaseCatalogItemRow[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (error) {
-      return { data: null, error: error.message };
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('catalog_items')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) {
+        if (allRows.length > 0) break;
+        return { data: null, error: error.message };
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allRows = allRows.concat(data as SupabaseCatalogItemRow[]);
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
+      // Safety guard max 50 pages (50,000 items)
+      if (page >= 50) break;
     }
 
-    const items: CatalogItem[] = (data || []).map((row: SupabaseCatalogItemRow) => ({
-      id: row.id,
-      itemCode: row.item_code,
-      itemName: row.item_name,
-      price: row.price,
-      mrp: row.mrp,
-      isVatted: row.is_vatted,
-      category: row.category,
-      format: row.format as CatalogItem['format'],
+    const items: CatalogItem[] = allRows.map((row: SupabaseCatalogItemRow) => ({
+      id: String(row.id),
+      itemCode: String(row.item_code || ''),
+      itemName: String(row.item_name || ''),
+      price: formatPriceWithDecimals(row.price),
+      mrp: row.mrp ? formatPriceWithDecimals(row.mrp) : formatPriceWithDecimals(row.price),
+      isVatted: Boolean(row.is_vatted),
+      category: row.category ? String(row.category) : 'General',
+      format: (row.format || 'CODE128') as CatalogItem['format'],
       createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
     }));
 
@@ -144,15 +167,15 @@ export async function insertCatalogItemToSupabase(
     }
 
     const createdItem: CatalogItem = {
-      id: data.id,
-      itemCode: data.item_code,
-      itemName: data.item_name,
-      price: data.price,
-      mrp: data.mrp,
-      isVatted: data.is_vatted,
-      category: data.category,
-      format: data.format,
-      createdAt: new Date(data.created_at).getTime(),
+      id: String(data.id),
+      itemCode: String(data.item_code || ''),
+      itemName: String(data.item_name || ''),
+      price: formatPriceWithDecimals(data.price),
+      mrp: data.mrp ? formatPriceWithDecimals(data.mrp) : formatPriceWithDecimals(data.price),
+      isVatted: Boolean(data.is_vatted),
+      category: data.category ? String(data.category) : 'General',
+      format: (data.format || 'CODE128') as CatalogItem['format'],
+      createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
     };
 
     return { data: createdItem, error: null };
@@ -188,15 +211,15 @@ export async function updateCatalogItemInSupabase(
     }
 
     const updatedItem: CatalogItem = {
-      id: data.id,
-      itemCode: data.item_code,
-      itemName: data.item_name,
-      price: data.price,
-      mrp: data.mrp,
-      isVatted: data.is_vatted,
-      category: data.category,
-      format: data.format,
-      createdAt: new Date(data.created_at).getTime(),
+      id: String(data.id),
+      itemCode: String(data.item_code || ''),
+      itemName: String(data.item_name || ''),
+      price: formatPriceWithDecimals(data.price),
+      mrp: data.mrp ? formatPriceWithDecimals(data.mrp) : formatPriceWithDecimals(data.price),
+      isVatted: Boolean(data.is_vatted),
+      category: data.category ? String(data.category) : 'General',
+      format: (data.format || 'CODE128') as CatalogItem['format'],
+      createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
     };
 
     return { data: updatedItem, error: null };
