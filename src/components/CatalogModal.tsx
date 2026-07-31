@@ -65,11 +65,22 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
   const filteredItems = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return items;
+    const tokens = q.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return items;
+
     return items.filter((item) => {
       const nameStr = String(item.itemName || '').toLowerCase();
       const codeStr = String(item.itemCode || '').toLowerCase();
       const catStr = String(item.category || '').toLowerCase();
-      return nameStr.includes(q) || codeStr.includes(q) || (catStr && catStr.includes(q));
+      const priceStr = String(item.price || '').toLowerCase();
+
+      return tokens.every(
+        (token) =>
+          nameStr.includes(token) ||
+          codeStr.includes(token) ||
+          catStr.includes(token) ||
+          priceStr.includes(token)
+      );
     });
   }, [items, searchTerm]);
 
@@ -363,11 +374,11 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
                     <p className="text-xs font-medium text-slate-500">No items match your search.</p>
                   </div>
                 ) : (
-                  paginatedItems.map((item) => {
+                  paginatedItems.map((item, idx) => {
                     const isSelected = selectedItemId === item.id;
                     return (
                       <div
-                        key={item.id}
+                        key={`${item.id}_${idx}`}
                         className={`p-3.5 rounded-xl border transition-all flex items-center justify-between gap-4 ${
                           isSelected
                             ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
