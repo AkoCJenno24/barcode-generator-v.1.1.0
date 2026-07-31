@@ -99,6 +99,7 @@ export async function fetchCatalogItemsFromSupabase(): Promise<{
         .from('catalog_items')
         .select('*')
         .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (error) {
@@ -123,9 +124,10 @@ export async function fetchCatalogItemsFromSupabase(): Promise<{
     const seenIds = new Set<string>();
     const items: CatalogItem[] = [];
     allRows.forEach((row: SupabaseCatalogItemRow, idx: number) => {
-      let rawId = String(row.id || `sup_${Date.now()}_${idx}`);
+      const rawId = String(row.id || `sup_${Date.now()}_${idx}`);
       if (seenIds.has(rawId)) {
-        rawId = `${rawId}_${idx}`;
+        // Skip duplicate records returned across page boundaries
+        return;
       }
       seenIds.add(rawId);
       items.push({
@@ -276,9 +278,10 @@ export async function fetchSavedBarcodesFromSupabase(): Promise<{
     const seenIds = new Set<string>();
     const items: BarcodeHistoryItem[] = [];
     (data || []).forEach((row: SupabaseSavedBarcodeRow, idx: number) => {
-      let rawId = String(row.id || `bc_${Date.now()}_${idx}`);
+      const rawId = String(row.id || `bc_${Date.now()}_${idx}`);
       if (seenIds.has(rawId)) {
-        rawId = `${rawId}_${idx}`;
+        // Skip duplicate records
+        return;
       }
       seenIds.add(rawId);
       items.push({
