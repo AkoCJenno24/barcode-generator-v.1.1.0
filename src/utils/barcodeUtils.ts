@@ -1,9 +1,10 @@
 import JsBarcode from 'jsbarcode';
 import { BarcodeFormat, BarcodeOptions } from '../types';
 
-export function formatPriceWithDecimals(priceStr: string | undefined | null): string {
-  if (!priceStr) return '';
-  const trimmed = priceStr.trim();
+export function formatPriceWithDecimals(priceStr: string | number | undefined | null): string {
+  if (priceStr === undefined || priceStr === null) return '';
+  const str = typeof priceStr === 'string' ? priceStr : String(priceStr);
+  const trimmed = str.trim();
   if (!trimmed) return '';
 
   const match = trimmed.match(/(\d+(?:\.\d+)?)/);
@@ -17,8 +18,8 @@ export function formatPriceWithDecimals(priceStr: string | undefined | null): st
   return trimmed;
 }
 
-export function formatPriceWithSymbol(priceStr: string | undefined | null): string {
-  if (!priceStr) return '';
+export function formatPriceWithSymbol(priceStr: string | number | undefined | null): string {
+  if (priceStr === undefined || priceStr === null) return '';
   const formattedDecimals = formatPriceWithDecimals(priceStr);
   if (!formattedDecimals) return '';
 
@@ -30,7 +31,7 @@ export function formatPriceWithSymbol(priceStr: string | undefined | null): stri
 }
 
 export function validateBarcodeValue(format: BarcodeFormat, text: string): { isValid: boolean; message?: string } {
-  const val = text.trim();
+  const val = String(text || '').trim();
   if (!val) {
     return { isValid: false, message: 'Please enter a barcode value' };
   }
@@ -260,9 +261,10 @@ export function renderRetailLabelSvg(svgElement: SVGSVGElement, options: Barcode
     ? `${options.letterSpacing}px` 
     : (options.font === 'serif' ? '0.3px' : '0px');
 
-  const cleanCode = (itemCode || '11002546').trim();
-  const cleanBatch = (batch !== undefined ? batch : '').trim();
-  const textToEncode = options.text?.trim() || (cleanBatch ? `${cleanCode}.${cleanBatch}` : cleanCode);
+  const cleanCode = String(itemCode ?? '11002546').trim();
+  const cleanBatch = String(batch !== undefined && batch !== null ? batch : '').trim();
+  const rawText = options.text !== undefined && options.text !== null ? String(options.text).trim() : '';
+  const textToEncode = rawText || (cleanBatch ? `${cleanCode}.${cleanBatch}` : cleanCode);
 
   // 1. Generate barcode lines using a temporary SVG element
   const hiddenSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
