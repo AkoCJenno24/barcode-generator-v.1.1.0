@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Barcode, Loader2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { BarcodePreview } from './components/BarcodePreview';
 import { BarcodeControls } from './components/BarcodeControls';
@@ -56,12 +57,13 @@ const DEFAULT_OPTIONS: BarcodeOptions = {
 };
 
 export default function App() {
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>(DEFAULT_CATALOG_ITEMS);
-  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(INITIAL_ITEM);
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [itemBatch, setItemBatch] = useState<string>(INITIAL_BATCH);
   const [options, setOptions] = useState<BarcodeOptions>(DEFAULT_OPTIONS);
   const [history, setHistory] = useState<BarcodeHistoryItem[]>([]);
   const [toast, setToast] = useState<ToastData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [isPrintSheetOpen, setIsPrintSheetOpen] = useState(false);
   const [isBatchOpen, setIsBatchOpen] = useState(false);
@@ -71,6 +73,8 @@ export default function App() {
 
   // Clear localStorage and load items directly from Supabase on mount
   useEffect(() => {
+    let isMounted = true;
+
     try {
       localStorage.clear();
       console.log('Cleared all items in localStorage as requested.');
@@ -78,27 +82,66 @@ export default function App() {
       console.warn('Could not clear localStorage:', e);
     }
 
-    // Auto-detect printer
-    detectLocalPrinter()
-      .then((res) => {
-        setOptions((prev) => applyPrinterPreset(prev, res.preset));
-      })
-      .catch(() => {});
+    const initializeData = async () => {
+      try {
+        // Auto-detect printer concurrently
+        detectLocalPrinter()
+          .then((res) => {
+            if (isMounted) {
+              setOptions((prev) => applyPrinterPreset(prev, res.preset));
+            }
+          })
+          .catch(() => {});
 
-    // Fetch catalog items directly from Supabase
-    fetchCatalogItemsFromSupabase().then((res) => {
-      if (res.data && res.data.length > 0) {
-        setCatalogItems(res.data);
-        setSelectedItem(res.data[0]);
-      }
-    });
+        // Fetch catalog items & history concurrently from Supabase
+        const [catalogRes, historyRes] = await Promise.all([
+          fetchCatalogItemsFromSupabase(),
+          fetchSavedBarcodesFromSupabase(),
+        ]);
 
-    // Fetch saved history from Supabase
-    fetchSavedBarcodesFromSupabase().then((res) => {
-      if (res.data && res.data.length > 0) {
-        setHistory(res.data);
+        if (!isMounted) return;
+
+        if (historyRes.data && historyRes.data.length > 0) {
+          setHistory(historyRes.data);
+        }
+
+        const fetchedItems = catalogRes.data && catalogRes.data.length > 0
+          ? catalogRes.data
+          : DEFAULT_CATALOG_ITEMS;
+
+        setCatalogItems(fetchedItems);
+
+        if (fetchedItems.length > 0) {
+          const firstItem = fetchedItems[0];
+          setSelectedItem(firstItem);
+          const cleanBatch = INITIAL_BATCH.trim();
+          setOptions((prev) => ({
+            ...prev,
+            text: cleanBatch ? `${firstItem.itemCode}.${cleanBatch}` : firstItem.itemCode,
+            itemCode: firstItem.itemCode,
+            itemName: firstItem.itemName,
+            price: firstItem.price,
+            format: firstItem.format || prev.format || 'CODE128',
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to initialize data from database:', err);
+        if (isMounted) {
+          setCatalogItems(DEFAULT_CATALOG_ITEMS);
+          setSelectedItem(DEFAULT_CATALOG_ITEMS[0]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    });
+    };
+
+    initializeData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleAddCatalogItem = async (newItemData: Omit<CatalogItem, 'id' | 'createdAt'>) => {
@@ -212,6 +255,17 @@ export default function App() {
   const handleSyncCatalogFromSupabase = (cloudItems: CatalogItem[]) => {
     if (!cloudItems || cloudItems.length === 0) return;
     setCatalogItems(cloudItems);
+    const firstItem = cloudItems[0];
+    setSelectedItem(firstItem);
+    const cleanBatch = itemBatch.trim();
+    setOptions((prev) => ({
+      ...prev,
+      text: cleanBatch ? `${firstItem.itemCode}.${cleanBatch}` : firstItem.itemCode,
+      itemCode: firstItem.itemCode,
+      itemName: firstItem.itemName,
+      price: firstItem.price,
+      format: firstItem.format || prev.format || 'CODE128',
+    }));
     setToast({
       id: Date.now(),
       title: 'Catalog Synced from Supabase',
@@ -268,6 +322,29 @@ export default function App() {
   const handleDeleteHistoryItem = (id: string) => {
     setHistory((prev) => prev.filter((item) => item.id !== id));
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 select-none">
+        <div className="flex flex-col items-center gap-4 max-w-sm text-center">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
+              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
+                <Barcode className="w-8 h-8 text-amber-400 animate-pulse" />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1 mt-2">
+            <h2 className="text-lg font-bold tracking-tight text-white">Loading Barcode Studio</h2>
+            <p className="text-xs text-slate-400 font-medium">Loading database catalog & settings...</p>
+          </div>
+          <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+            <div className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full animate-pulse w-full"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100/60 font-sans text-slate-900 flex flex-col selection:bg-slate-900 selection:text-white">
@@ -382,4 +459,3 @@ export default function App() {
     </div>
   );
 }
-
