@@ -649,8 +649,8 @@ export const SupabaseSyncModal: React.FC<SupabaseSyncModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {paginatedRemoteCatalog.map((item) => (
-                          <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        {paginatedRemoteCatalog.map((item, idx) => (
+                          <tr key={`${item.id}_${idx}`} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-2.5 font-mono font-bold text-slate-900">{item.itemCode}</td>
                             <td className="px-4 py-2.5 font-medium text-slate-800">{item.itemName}</td>
                             <td className="px-4 py-2.5 text-slate-500">
@@ -871,8 +871,8 @@ export const SupabaseSyncModal: React.FC<SupabaseSyncModalProps> = ({
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-200">
-                    {filteredRemoteBarcodes.map((bc) => (
-                      <div key={bc.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    {filteredRemoteBarcodes.map((bc, idx) => (
+                      <div key={`${bc.id}_${idx}`} className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-xs text-slate-900">{bc.title}</span>
