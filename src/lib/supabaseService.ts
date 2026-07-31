@@ -120,17 +120,26 @@ export async function fetchCatalogItemsFromSupabase(): Promise<{
       if (page >= 50) break;
     }
 
-    const items: CatalogItem[] = allRows.map((row: SupabaseCatalogItemRow) => ({
-      id: String(row.id),
-      itemCode: String(row.item_code || ''),
-      itemName: String(row.item_name || ''),
-      price: formatPriceWithDecimals(row.price),
-      mrp: row.mrp ? formatPriceWithDecimals(row.mrp) : formatPriceWithDecimals(row.price),
-      isVatted: Boolean(row.is_vatted),
-      category: row.category ? String(row.category) : 'General',
-      format: (row.format || 'CODE128') as CatalogItem['format'],
-      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-    }));
+    const seenIds = new Set<string>();
+    const items: CatalogItem[] = [];
+    allRows.forEach((row: SupabaseCatalogItemRow, idx: number) => {
+      let rawId = String(row.id || `sup_${Date.now()}_${idx}`);
+      if (seenIds.has(rawId)) {
+        rawId = `${rawId}_${idx}`;
+      }
+      seenIds.add(rawId);
+      items.push({
+        id: rawId,
+        itemCode: String(row.item_code || ''),
+        itemName: String(row.item_name || ''),
+        price: formatPriceWithDecimals(row.price),
+        mrp: row.mrp ? formatPriceWithDecimals(row.mrp) : formatPriceWithDecimals(row.price),
+        isVatted: Boolean(row.is_vatted),
+        category: row.category ? String(row.category) : 'General',
+        format: (row.format || 'CODE128') as CatalogItem['format'],
+        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+      });
+    });
 
     return { data: items, error: null };
   } catch (err: unknown) {
@@ -264,14 +273,23 @@ export async function fetchSavedBarcodesFromSupabase(): Promise<{
       return { data: null, error: error.message };
     }
 
-    const items: BarcodeHistoryItem[] = (data || []).map((row: SupabaseSavedBarcodeRow) => ({
-      id: row.id,
-      title: row.title,
-      text: row.text,
-      format: row.format as BarcodeHistoryItem['format'],
-      options: row.options,
-      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-    }));
+    const seenIds = new Set<string>();
+    const items: BarcodeHistoryItem[] = [];
+    (data || []).forEach((row: SupabaseSavedBarcodeRow, idx: number) => {
+      let rawId = String(row.id || `bc_${Date.now()}_${idx}`);
+      if (seenIds.has(rawId)) {
+        rawId = `${rawId}_${idx}`;
+      }
+      seenIds.add(rawId);
+      items.push({
+        id: rawId,
+        title: row.title,
+        text: row.text,
+        format: row.format as BarcodeHistoryItem['format'],
+        options: row.options,
+        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+      });
+    });
 
     return { data: items, error: null };
   } catch (err: unknown) {
