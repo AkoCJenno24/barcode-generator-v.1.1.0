@@ -151,8 +151,9 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
   };
 
   const handleBatchChange = (newBatch: string) => {
-    onChangeBatch(newBatch);
-    const cleanBatch = newBatch.trim();
+    const uppercaseBatch = newBatch.toUpperCase();
+    onChangeBatch(uppercaseBatch);
+    const cleanBatch = uppercaseBatch.trim();
     if (selectedItem) {
       const combinedText = cleanBatch ? `${selectedItem.itemCode}.${cleanBatch}` : selectedItem.itemCode;
       onChangeOptions({
@@ -366,7 +367,7 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
               value={itemBatch}
               onChange={(e) => handleBatchChange(e.target.value)}
               placeholder="e.g. R1456"
-              className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 font-mono text-xs focus:outline-hidden focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all shadow-xs"
+              className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 font-mono text-xs focus:outline-hidden focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all shadow-xs uppercase"
             />
             {itemBatch && (
               <button
