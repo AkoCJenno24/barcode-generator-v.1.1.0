@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { CatalogItem } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import {
@@ -13,6 +13,10 @@ import {
   Hash,
   DollarSign,
   Barcode,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 
 interface CatalogModalProps {
@@ -37,6 +41,9 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
   selectedItemId,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDeleteItem, setPendingDeleteItem] = useState<CatalogItem | null>(null);
@@ -48,6 +55,31 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
   const [mrp, setMrp] = useState('');
   const [isVatted, setIsVatted] = useState(false);
   const [category, setCategory] = useState('');
+
+  // Reset page when search or pageSize changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, pageSize]);
+
+  // High performance memoized filtering for 20,000+ items
+  const filteredItems = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => {
+      const nameStr = String(item.itemName || '').toLowerCase();
+      const codeStr = String(item.itemCode || '').toLowerCase();
+      const catStr = String(item.category || '').toLowerCase();
+      return nameStr.includes(q) || codeStr.includes(q) || (catStr && catStr.includes(q));
+    });
+  }, [items, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedItems = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, safeCurrentPage, pageSize]);
 
   if (!isOpen) return null;
 
@@ -125,15 +157,6 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
     setIsAdding(false);
     setEditingId(null);
   };
-
-  const filteredItems = items.filter((item) => {
-    const q = searchTerm.toLowerCase();
-    return (
-      item.itemName.toLowerCase().includes(q) ||
-      item.itemCode.toLowerCase().includes(q) ||
-      (item.category && item.category.toLowerCase().includes(q))
-    );
-  });
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -333,14 +356,14 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
               </div>
 
               {/* Items List */}
-              <div className="space-y-2">
+              <div className="space-y-2 min-h-[220px]">
                 {filteredItems.length === 0 ? (
                   <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl">
                     <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="text-xs font-medium text-slate-500">No items match your search.</p>
                   </div>
                 ) : (
-                  filteredItems.map((item) => {
+                  paginatedItems.map((item) => {
                     const isSelected = selectedItemId === item.id;
                     return (
                       <div
@@ -460,6 +483,78 @@ export const CatalogModal: React.FC<CatalogModalProps> = ({
                   })
                 )}
               </div>
+
+              {/* Pagination Bar */}
+              {filteredItems.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/80 text-xs">
+                  <div className="flex items-center gap-2 text-slate-500 font-medium">
+                    <span>
+                      Showing{' '}
+                      <strong className="text-slate-900">
+                        {((safeCurrentPage - 1) * pageSize + 1).toLocaleString()}
+                      </strong>{' '}
+                      to{' '}
+                      <strong className="text-slate-900">
+                        {Math.min(safeCurrentPage * pageSize, filteredItems.length).toLocaleString()}
+                      </strong>{' '}
+                      of <strong className="text-slate-900">{filteredItems.length.toLocaleString()}</strong>
+                    </span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="ml-2 px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-hidden"
+                    >
+                      <option value={25}>25 / page</option>
+                      <option value={50}>50 / page</option>
+                      <option value={100}>100 / page</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage === 1}
+                      onClick={() => setCurrentPage(1)}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="First Page"
+                    >
+                      <ChevronsLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+
+                    <span className="px-2.5 py-1 font-bold text-slate-800 text-xs">
+                      Page {safeCurrentPage} of {totalPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Next Page"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage === totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Last Page"
+                    >
+                      <ChevronsRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
