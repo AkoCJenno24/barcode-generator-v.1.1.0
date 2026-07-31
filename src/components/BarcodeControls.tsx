@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BarcodeOptions, BarcodeFormat, BarcodePreset, CatalogItem } from '../types';
 import { PRESETS, BARCODE_FORMAT_INFO } from '../data/presets';
 import { formatPriceWithDecimals, formatPriceWithSymbol } from '../utils/barcodeUtils';
@@ -24,6 +24,7 @@ import {
   Printer,
   RefreshCw,
   Cpu,
+  Search,
 } from 'lucide-react';
 
 interface BarcodeControlsProps {
@@ -52,6 +53,44 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
   const [activeTab, setActiveTab] = useState<'dimensions' | 'colors' | 'text'>('dimensions');
   const [isDetectingPrinter, setIsDetectingPrinter] = useState<boolean>(false);
   const [detectionStatus, setDetectionStatus] = useState<string | null>(null);
+
+  // Searchable Combobox state for 20,000+ catalog items
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [comboboxSearch, setComboboxSearch] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Truncate filtered search results to max 40 items for ultra-fast rendering with large datasets
+  const comboboxFiltered = useMemo(() => {
+    const q = comboboxSearch.trim().toLowerCase();
+    if (!q) return catalogItems.slice(0, 40);
+
+    const results: CatalogItem[] = [];
+    for (let i = 0; i < catalogItems.length; i++) {
+      const item = catalogItems[i];
+      const nameStr = String(item.itemName || '').toLowerCase();
+      const codeStr = String(item.itemCode || '').toLowerCase();
+      const catStr = String(item.category || '').toLowerCase();
+      if (
+        nameStr.includes(q) ||
+        codeStr.includes(q) ||
+        (catStr && catStr.includes(q))
+      ) {
+        results.push(item);
+        if (results.length >= 40) break;
+      }
+    }
+    return results;
+  }, [catalogItems, comboboxSearch]);
 
   const handleAutoDetect = async () => {
     setIsDetectingPrinter(true);
@@ -164,22 +203,142 @@ export const BarcodeControls: React.FC<BarcodeControlsProps> = ({
           </button>
         </div>
 
-        {/* Item Dropdown */}
-        <div className="relative">
-          <select
-            id="catalog-item-select"
-            value={selectedItem ? selectedItem.id : 'custom'}
-            onChange={(e) => handleSelectCatalogItem(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-semibold appearance-none focus:outline-hidden focus:ring-2 focus:ring-slate-900 pr-10 shadow-xs cursor-pointer"
+        {/* Item Dropdown / Search Combobox */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-semibold flex items-center justify-between shadow-xs hover:border-slate-300 transition-colors cursor-pointer"
           >
-            <option value="custom">-- Direct Custom Input --</option>
-            {catalogItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.itemName} — Code: {item.itemCode} ({item.price})
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <div className="flex items-center gap-2 truncate pr-2">
+              <Package className="w-4 h-4 text-slate-400 shrink-0" />
+              {selectedItem ? (
+                <span className="truncate">
+                  <strong className="text-slate-900">{selectedItem.itemName}</strong>
+                  <span className="text-slate-500 font-normal ml-1">
+                    ({selectedItem.itemCode} • {selectedItem.price})
+                  </span>
+                </span>
+              ) : (
+                <span className="text-slate-500 italic">-- Direct Custom Input --</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded-full border border-slate-200">
+                {catalogItems.length.toLocaleString()} items
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+
+          {/* Dropdown panel */}
+          {isDropdownOpen && (
+            <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-80">
+              {/* Search input inside dropdown */}
+              <div className="p-2 border-b border-slate-100 bg-slate-50/80 flex items-center gap-2">
+                <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={comboboxSearch}
+                  onChange={(e) => setComboboxSearch(e.target.value)}
+                  placeholder="Search code, name or category..."
+                  className="w-full text-xs bg-transparent border-none focus:outline-hidden text-slate-900"
+                />
+                {comboboxSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setComboboxSearch('')}
+                    className="text-slate-400 hover:text-slate-600 p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Options list */}
+              <div className="overflow-y-auto flex-1 p-1 space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSelectCatalogItem('custom');
+                    setIsDropdownOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors ${
+                    !selectedItem ? 'bg-slate-900 text-white' : 'hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  <span>-- Direct Custom Input --</span>
+                  {!selectedItem && <Check className="w-3.5 h-3.5 text-white" />}
+                </button>
+
+                {comboboxFiltered.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-xs text-slate-400 italic">
+                    No matching items found ({catalogItems.length.toLocaleString()} total)
+                  </div>
+                ) : (
+                  comboboxFiltered.map((item) => {
+                    const isSelected = selectedItem?.id === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          handleSelectCatalogItem(item.id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors ${
+                          isSelected
+                            ? 'bg-slate-900 text-white font-bold'
+                            : 'hover:bg-slate-100 text-slate-800'
+                        }`}
+                      >
+                        <div className="truncate min-w-0">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="truncate">{item.itemName}</span>
+                            {item.category && (
+                              <span
+                                className={`text-[9px] px-1.5 py-0.2 rounded font-normal ${
+                                  isSelected ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {item.category}
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className={`text-[10px] font-mono mt-0.5 ${
+                              isSelected ? 'text-slate-300' : 'text-slate-500'
+                            }`}
+                          >
+                            Code: {item.itemCode} • Price: {item.price}
+                          </div>
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-white shrink-0" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer bar */}
+              <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                <span>
+                  Showing max 40 of {catalogItems.length.toLocaleString()} items
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    onOpenCatalogModal();
+                  }}
+                  className="text-slate-900 font-bold hover:underline"
+                >
+                  View All Catalog
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Dynamic Item Batch Field (Untracked on-the-fly input) */}
